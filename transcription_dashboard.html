@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ניהול חלוקת תמלולים</title>
+<style>
+  :root{
+    --bg:#0f172a; /* Slate 900 */
+    --card:#1e293b; /* Slate 800 */
+    --line:#334155; /* Slate 700 */
+    --text:#f8fafc; /* Slate 50 */
+    --muted:#94a3b8; /* Slate 400 */
+    --accent:#38bdf8; /* Sky 400 (Premium blue-cyan glow) */
+    --accent-dark:#0284c7; /* Sky 600 */
+    --free-bg:#064e3b; 
+    --free-fg:#34d399; 
+    --busy-bg:#78350f; 
+    --busy-fg:#fbbf24; 
+    --full-bg:#7f1d1d; 
+    --full-fg:#f87171; 
+    --gray-bg:#475569; 
+    --gray-fg:#cbd5e1; 
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Segoe UI",Arial,"Heebo",sans-serif;background:var(--bg);
+    color:var(--text);font-size:14px;line-height:1.5;}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:13px 24px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  header h1{font-size:19px;font-weight:700;}
+  header h1 span{color:var(--accent); text-shadow: 0 0 8px rgba(56, 189, 248, 0.4);}
+  .head-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .freshness{font-size:12px;color:var(--muted);}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;}
+  button{font-family:inherit;font-size:13px;cursor:pointer;border-radius:6px;
+    border:1px solid var(--line);background:var(--card);color:var(--text);padding:7px 13px;
+    transition:background .12s,border-color .12s;}
+  button:hover{background:#334155;}
+  button.primary{background:var(--accent);color:#0f172a;border-color:var(--accent);font-weight:600;}
+  button.primary:hover{background:var(--accent-dark);color:#fff;border-color:var(--accent-dark);}
+  button.tiny{padding:4px 9px;font-size:12px;}
+  button.danger{color:var(--full-fg);border-color:#7f1d1d;}
+  button.danger:hover{background:var(--full-bg);}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+
+  nav.tabs{display:flex;gap:4px;padding:0 24px;background:var(--card);border-bottom:1px solid var(--line);}
+  nav.tabs button{border:none;border-bottom:3px solid transparent;border-radius:0;background:none;
+    padding:12px 18px;font-size:14px;color:var(--muted);}
+  nav.tabs button:hover{background:#334155;}
+  nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+  nav.tabs .badge-count{background:var(--accent);color:#0f172a;border-radius:10px;
+    font-size:11px;padding:1px 7px;margin-right:6px;font-weight:700;}
+
+  main{padding:22px 24px;max-width:1320px;margin:0 auto;}
+  section.panel{display:none;}
+  section.panel.active{display:block;}
+
+  .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:8px;
+    padding:13px 18px;min-width:118px;flex:1;box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);}
+  .stat .num{font-size:24px;font-weight:700;}
+  .stat .lbl{color:var(--muted);font-size:12px;}
+  .stat.free .num{color:var(--free-fg);}
+  .stat.busy .num{color:var(--busy-fg);}
+  .stat.full .num{color:var(--full-fg);}
+
+  .banner{background:#3b2e11;border:1px solid #78350f;border-radius:8px;padding:11px 16px;
+    margin-bottom:16px;font-size:13px;color:#fbbf24;display:flex;justify-content:space-between;
+    align-items:center;gap:12px;}
+
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;
+    flex-wrap:wrap;gap:10px;}
+  .panel-head h2{font-size:16px; border-right: 3px solid var(--accent); padding-right: 8px;}
+  .filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .filter-row input,.filter-row select{padding:7px 10px;border:1px solid var(--line);
+    border-radius:6px;font-family:inherit;font-size:13px;background:var(--card);color:var(--text);}
+  .filter-row input::placeholder{color:var(--muted);}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);
+    border-radius:8px;overflow:hidden;}
+  th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);}
+  th{background:#0f172a;font-size:12px;color:var(--muted);font-weight:600;}
+  tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#2e3c54;}
+  tr.selected{background:#1e3a8a !important;}
+  tr.clickable{cursor:pointer;}
+
+  .badge{display:inline-block;padding:3px 10px;border-radius:11px;font-size:12px;font-weight:600;}
+  .badge.free{background:var(--free-bg);color:var(--free-fg);}
+  .badge.busy{background:var(--busy-bg);color:var(--busy-fg);}
+  .badge.full{background:var(--full-bg);color:var(--full-fg);}
+  .badge.unknown{background:var(--gray-bg);color:var(--gray-fg);}
+  .badge.assigned{background:#1e3a8a;color:var(--accent);}
+  .badge.in_progress{background:var(--busy-bg);color:var(--busy-fg);}
+  .badge.completed{background:var(--free-bg);color:var(--free-fg);}
+  .badge.region{background:#1e293b;color:var(--accent);border:1px solid var(--line);}
+  .badge.urg-דחוף,.badge.urg-מיידי,.badge.urg-חריג{background:var(--full-bg);color:var(--full-fg);}
+  .badge.urg-רגיל{background:var(--gray-bg);color:var(--gray-fg);}
+
+  .bar{height:6px;background:#1e293b;border-radius:4px;margin-top:4px;overflow:hidden;}
+  .bar>div{height:100%;border-radius:4px;}
+  .load-cell{min-width:130px;}
+  .load-cell .txt{font-size:12px;white-space:nowrap;}
+  .contact{font-size:12px;color:var(--muted);}
+  .area-txt{font-size:12px;color:var(--muted);max-width:230px;}
+
+  .empty{padding:34px;text-align:center;color:var(--muted);background:var(--card);
+    border:1px dashed var(--line);border-radius:8px;}
+  .deadline-soon{color:var(--full-fg);font-weight:600;text-shadow: 0 0 4px rgba(239, 68, 68, 0.2);}
+
+  .assign-panel{margin-top:18px;background:var(--card);border:2px solid var(--accent);
+    border-radius:10px;padding:16px 18px;box-shadow: 0 0 15px rgba(56, 189, 248, 0.15);}
+  .assign-panel h3{font-size:15px;margin-bottom:4px;}
+  .ap-meta{font-size:13px;color:var(--muted);margin-bottom:12px;}
+  .ap-dur{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .ap-dur input{width:90px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;
+    font-family:inherit;font-size:13px;background:var(--bg);color:var(--text);}
+  .ap-dur .hint{font-size:12px;color:var(--muted);}
+
+  .cand{background:#1e293b;border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+    margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:14px;
+    flex-wrap:wrap;transition: border-color .15s;}
+  .cand.recommended{border-color:var(--free-fg);border-width:2px;background:#142c22;}
+  .cand .info{flex:1;min-width:240px;}
+  .cand .name-row{display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+  .cand .name-row strong{font-size:15px;}
+  .ribbon{background:var(--free-fg);color:#0f172a;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;}
+  .cand .area{font-size:12px;color:var(--accent);background:#1e293b;border:1px solid var(--line);padding:2px 8px;
+    border-radius:5px;display:inline-block;margin:2px 0;}
+  .cand .meta{font-size:12px;color:var(--muted);}
+
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.8);
+    align-items:center;justify-content:center;z-index:50;}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px;width:430px;max-width:92vw;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);}
+  .modal h3{margin-bottom:14px;font-size:16px;}
+  .modal .field{margin-bottom:13px;}
+  .modal .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .modal .field input{width:100%;padding:8px 10px;border:1px solid var(--line);
+    border-radius:6px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--text);}
+  .modal .hint{font-size:12px;color:var(--muted);margin:-8px 0 13px;}
+  .modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
+
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#f8fafc;
+    color:#0f172a;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;
+    pointer-events:none;transition:opacity .25s;z-index:80;box-shadow: 0 4px 12px rgba(0,0,0,0.3);}
+  #toast.show{opacity:1;}
+  .help{font-size:12px;color:var(--muted);line-height:1.7;background:var(--card);
+    border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-bottom:16px;}
+  code{background:#0f172a;color:var(--accent);padding:1px 5px;border-radius:4px;font-size:12px;border:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ניהול חלוקת <span>תמלולים</span></h1>
+  <div class="head-right">
+    <span class="freshness" id="freshness"></span>
+    <div class="toolbar">
+      <button id="btnSync" class="primary">סנכרן מהאקסל</button>
+      <button id="btnImport">ייבוא קובץ JSON</button>
+      <button id="btnSettings">הגדרות</button>
+      <input type="file" id="fileInput" accept=".json" hidden>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="dashboard" class="active">לוח בקרה</button>
+  <button data-tab="queue">תיקים לשיבוץ<span class="badge-count" id="queueBadge">0</span></button>
+  <button data-tab="tracking">מעקב שיבוצים</button>
+</nav>
+
+<main>
+  <!-- ===== DASHBOARD ===== -->
+  <section id="dashboard" class="panel active">
+    <div id="dashBanner"></div>
+    <div class="cards" id="dashStats"></div>
+    <div class="panel-head">
+      <h2>רשימת המתמללים</h2>
+      <div class="filter-row"><input type="text" id="dashSearch" placeholder="חיפוש לפי שם..."></div>
+    </div>
+    <div id="dashTable"></div>
+  </section>
+
+  <!-- ===== QUEUE ===== -->
+  <section id="queue" class="panel">
+    <div class="help" id="queueHelp"></div>
+    <div class="panel-head">
+      <h2>תיקים ממתינים לשיבוץ</h2>
+      <div class="filter-row">
+        <select id="regionFilter">
+          <option value="all">כל האזורים</option>
+          <option value="ירושלים">ירושלים</option>
+          <option value="דרום">דרום</option>
+        </select>
+        <select id="courtTypeFilter">
+          <option value="all">כל בתי המשפט</option>
+          <option value="שלום">שלום</option>
+          <option value="מחוזי">מחוזי</option>
+          <option value="עליון">עליון</option>
+        </select>
+      </div>
+    </div>
+    <div id="queueTable"></div>
+    <div id="assignPanel"></div>
+  </section>
+
+  <!-- ===== TRACKING ===== -->
+  <section id="tracking" class="panel">
+    <div class="cards" id="trackStats"></div>
+    <div class="panel-head">
+      <h2>תיקים פעילים בעבודה (נתונים מהאקסל)</h2>
+      <div class="filter-row">
+        <input type="text" id="trackTranscriberFilter" placeholder="חיפוש לפי מתמלל...">
+        <select id="trackFilter">
+          <option value="all">כל התיקים בעבודה</option>
+          <option value="delayed">באיחור (עבר דדליין)</option>
+          <option value="soon">קרוב לדדליין (עד יומיים)</option>
+          <option value="normal">בזמן</option>
+        </select>
+        <select id="trackRegionFilter">
+          <option value="all">כל האזורים</option>
+          <option value="ירושלים">ירושלים</option>
+          <option value="דרום">דרום</option>
+        </select>
+        <select id="trackCourtFilter">
+          <option value="all">כל בתי המשפט</option>
+          <option value="שלום">שלום</option>
+          <option value="מחוזי">מחוזי</option>
+          <option value="עליון">עליון</option>
+        </select>
+      </div>
+    </div>
+    <div id="trackTable"></div>
+  </section>
+</main>
+
+<!-- ===== SETTINGS ===== -->
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <h3>הגדרות זמינות</h3>
+    <div class="field">
+      <label>"פנוי" — עד כמה ימי תור</label>
+      <input type="number" id="setFree" min="0" step="0.5">
+    </div>
+    <div class="field">
+      <label>"מלא" — מעל כמה ימי תור</label>
+      <input type="number" id="setFull" min="0" step="0.5">
+    </div>
+    <div class="hint">ימי תור = שעות בתור חלקי קצב יומי. בין שני הערכים — "עמוס".</div>
+    <div class="foot">
+      <button id="setCancel">ביטול</button>
+      <button id="setSave" class="primary">שמירה</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ===== Labels & keys =====
+const STATUS_LABELS={assigned:'שובץ',in_progress:'בעבודה',completed:'הושלם'};
+const AVAIL_LABELS={free:'פנוי',busy:'עמוס',full:'מלא',unknown:'לא ידוע'};
+const STATUS_RANK={free:0,busy:1,full:2,unknown:3};
+const LS_DATA='tdash_data', LS_ASSIGN='tdash_assignments', LS_SETTINGS='tdash_settings';
+const DEFAULT_SETTINGS={freeDays:2,fullDays:5};
+
+// ===== Sample data (shown until real data is imported) =====
+const SAMPLE={
+  generated:'נתוני דוגמה', recentDays:30, queueDays:90,
+  transcribers:[
+    {name:'אורה לוי (דוגמה)',email:'demo1@example.com',hoursPerDay:2.5,area:'הכל',baseCases:3,baseHours:6},
+    {name:'בני כהן (דוגמה)',email:'demo2@example.com',hoursPerDay:2,area:'לא מחוזי ירושלים',baseCases:5,baseHours:9},
+    {name:'גילה מזרחי (דוגמה)',email:'demo3@example.com',hoursPerDay:1,area:'מחוזי באר שבע',baseCases:6,baseHours:7},
+    {name:'דנה אבני (דוגמה)',email:'demo4@example.com',hoursPerDay:3,area:'הכל',baseCases:1,baseHours:2},
+    {name:'הילה רון (דוגמה)',email:'demo5@example.com',hoursPerDay:2,area:'הכל עדיף קצרים',baseCases:7,baseHours:11},
+  ],
+  hearings:[
+    {region:'ירושלים',case:'12345-01-26',court:'ירושלים שלום',city:'ירושלים',date:'2026-05-20',urgency:'רגיל',hours:2.5,deadline:'2026-06-03',hearingType:'',row:0},
+    {region:'דרום',case:'67890-02-26',court:'באר שבע מחוזי',city:'באר שבע',date:'2026-05-19',urgency:'דחוף',hours:8,deadline:'2026-05-26',hearingType:'',row:0},
+    {region:'ירושלים',case:'11111-03-26',court:'ירושלים מחוזי',city:'ירושלים',date:'2026-05-21',urgency:'רגיל',hours:0,deadline:'2026-06-04',hearingType:'',row:0},
+    {region:'דרום',case:'22222-04-26',court:'באר שבע שלום',city:'באר שבע',date:'2026-05-18',urgency:'רגיל',hours:4.5,deadline:'2026-06-01',hearingType:'',row:0},
+  ],
+  activeHearings:[],
+};
+
+// ===== State =====
+let data={...SAMPLE}, assignments=[], settings={...DEFAULT_SETTINGS};
+let isSample=true, selectedKey=null;
+
+// ===== Storage =====
+function load(){
+  try{const d=JSON.parse(localStorage.getItem(LS_DATA));
+    if(d&&Array.isArray(d.transcribers)){data=d;isSample=false;}}catch(e){}
+  try{const a=JSON.parse(localStorage.getItem(LS_ASSIGN));if(Array.isArray(a))assignments=a;}catch(e){}
+  try{const s=JSON.parse(localStorage.getItem(LS_SETTINGS));if(s)settings={...DEFAULT_SETTINGS,...s};}catch(e){}
+}
+const saveData=()=>localStorage.setItem(LS_DATA,JSON.stringify(data));
+const saveAssign=()=>localStorage.setItem(LS_ASSIGN,JSON.stringify(assignments));
+const saveSettings=()=>localStorage.setItem(LS_SETTINGS,JSON.stringify(settings));
+
+// Auto-complete local assignments that Excel no longer lists as active.
+// When a transcriber delivers a file, Excel removes it from activeHearings.
+// This syncs the local assignment store so workload counts stay accurate.
+function syncAssignmentsWithExcel(){
+  if(isSample||!data.activeHearings) return;
+  const activeKeys=new Set(data.activeHearings.map(h=>h.region+'|'+h.case+'|'+h.date));
+  let changed=false;
+  assignments.forEach(a=>{
+    if(a.status!=='completed'){
+      const key=a.region+'|'+a.case+'|'+a.date;
+      if(!activeKeys.has(key)){
+        a.status='completed';
+        if(!a.completedDate) a.completedDate=new Date().toISOString();
+        changed=true;
+      }
+    }
+  });
+  if(changed) saveAssign();
+}
+
+// ===== Utils =====
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>(
+  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function uid(){return 'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function fmtDate(iso){if(!iso)return '—';const d=new Date(iso);
+  return isNaN(d)?esc(iso):d.toLocaleDateString('he-IL');}
+function num(v,d){const x=parseFloat(v);return isNaN(x)?d:x;}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
+function hkey(h){return h.region+'|'+h.case+'|'+h.date;}
+
+// ===== Computation =====
+function workload(name){
+  let cases=0,hours=0;
+  assignments.forEach(a=>{
+    if(a.transcriber===name&&(a.status==='assigned'||a.status==='in_progress')){
+      cases++;hours+=num(a.duration,0);
+    }
+  });
+  const t=data.transcribers.find(x=>x.name===name);
+  if(t){cases+=num(t.baseCases,0);hours+=num(t.baseHours,0);}
+  return {cases,hours};
+}
+function queueInfo(t){
+  const w=workload(t.name);
+  const rate=num(t.hoursPerDay,0);
+  const days=rate>0?w.hours/rate:null;
+  return {cases:w.cases,hours:w.hours,rate,days};
+}
+function statusOf(t){
+  const q=queueInfo(t);
+  if(q.days==null) return {...q,status:'unknown'};
+  let s='busy';
+  if(q.days<=settings.freeDays) s='free';
+  else if(q.days>settings.fullDays) s='full';
+  return {...q,status:s};
+}
+function daysSinceLast(name){
+  let latest=null;
+  assignments.forEach(a=>{if(a.transcriber===name){const d=new Date(a.assignedDate);
+    if(!latest||d>latest)latest=d;}});
+  return latest?Math.floor((Date.now()-latest.getTime())/86400000):Infinity;
+}
+function compareT(a,b){
+  const sa=statusOf(a),sb=statusOf(b);
+  if(STATUS_RANK[sa.status]!==STATUS_RANK[sb.status])
+    return STATUS_RANK[sa.status]-STATUS_RANK[sb.status];
+  const da=sa.days==null?1e9:sa.days, db=sb.days==null?1e9:sb.days;
+  if(da!==db) return da-db;
+  return daysSinceLast(b.name)-daysSinceLast(a.name);
+}
+function pendingHearings(){
+  const taken=new Set(assignments.map(a=>a.region+'|'+a.case+'|'+a.date));
+  return data.hearings.filter(h=>!taken.has(hkey(h)));
+}
+
+// ===== Import =====
+function importJSON(text){
+  let d;
+  try{d=JSON.parse(text);}catch(e){alert('הקובץ אינו JSON תקין.');return;}
+  if(!d||!Array.isArray(d.transcribers)||!Array.isArray(d.hearings)){
+    alert('מבנה הקובץ אינו תקין. הפעל את export_dashboard_data.py כדי לייצר אותו.');return;
+  }
+  data=d;isSample=false;selectedKey=null;saveData();
+  renderAll();
+  toast('יובאו '+d.transcribers.length+' מתמללים ו-'+d.hearings.length+' תיקים');
+}
+
+// ===== Render: dashboard =====
+function statCard(lbl,n,cls){
+  return '<div class="stat '+(cls||'')+'"><div class="num">'+n+'</div><div class="lbl">'+lbl+'</div></div>';
+}
+function loadBar(used,cap){
+  const u=cap>0?used/cap:0, pct=Math.min(100,Math.round(u*100));
+  const col=u>=1?'var(--full-fg)':u>=0.6?'var(--busy-fg)':'var(--free-fg)';
+  return '<div class="bar"><div style="width:'+pct+'%;background:'+col+'"></div></div>';
+}
+function renderFreshness(){
+  const f=document.getElementById('freshness');
+  if(isSample){f.textContent='מוצגים נתוני דוגמה';return;}
+  f.textContent='נתונים מ-'+esc(data.generated||'')+' · '+data.hearings.length+' תיקים';
+}
+function renderDashboard(){
+  document.getElementById('dashBanner').innerHTML = isSample ?
+    '<div class="banner"><span>מוצגים נתוני דוגמה. לחץ "ייבוא נתונים מהאקסל" וטען את הקובץ '+
+    '<code>dashboard_data.json</code> שנוצר על ידי <code>export_dashboard_data.py</code>.</span>'+
+    '<button class="tiny" onclick="document.getElementById(\'fileInput\').click()">ייבוא</button></div>' : '';
+
+  const c={free:0,busy:0,full:0,unknown:0};
+  data.transcribers.forEach(t=>c[statusOf(t).status]++);
+  document.getElementById('dashStats').innerHTML=
+    statCard('סה״כ מתמללים',data.transcribers.length,'')+
+    statCard('פנויים',c.free,'free')+
+    statCard('עמוסים',c.busy,'busy')+
+    statCard('מלאים',c.full,'full');
+
+  const q=(document.getElementById('dashSearch').value||'').trim();
+  let list=data.transcribers.slice();
+  if(q) list=list.filter(t=>(t.name||'').includes(q));
+  list.sort(compareT);
+
+  const box=document.getElementById('dashTable');
+  if(!data.transcribers.length){box.innerHTML='<div class="empty">אין מתמללים. ייבא נתונים.</div>';return;}
+  if(!list.length){box.innerHTML='<div class="empty">לא נמצאו מתמללים לחיפוש זה.</div>';return;}
+
+  let rows='';
+  list.forEach(t=>{
+    const s=statusOf(t);
+    const dsl=daysSinceLast(t.name);
+    const daysTxt=s.days==null?'—':s.days.toFixed(1)+' ימים';
+    rows+='<tr>'+
+      '<td><strong>'+esc(t.name)+'</strong></td>'+
+      '<td class="contact">'+esc(t.email||'')+'</td>'+
+      '<td class="area-txt">'+esc(t.area||'—')+'</td>'+
+      '<td>'+(t.hoursPerDay?esc(t.hoursPerDay):'—')+'</td>'+
+      '<td>'+s.cases+'</td>'+
+      '<td class="load-cell"><div class="txt">'+s.hours.toFixed(1)+' שעות</div>'+
+        loadBar(s.days==null?0:s.days,settings.fullDays)+'</td>'+
+      '<td>'+daysTxt+'</td>'+
+      '<td>'+(dsl===Infinity?'—':dsl+' ימים')+'</td>'+
+      '<td><span class="badge '+s.status+'">'+AVAIL_LABELS[s.status]+'</span></td>'+
+    '</tr>';
+  });
+  box.innerHTML='<table><thead><tr>'+
+    '<th>שם</th><th>מייל</th><th>אזור מועדף</th><th>שעות/יום</th><th>תיקים פעילים</th>'+
+    '<th>שעות בתור</th><th>ימי תור</th><th>שיבוץ אחרון</th><th>זמינות</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+// ===== Render: queue =====
+function deadlineCell(iso){
+  if(!iso) return '—';
+  const d=new Date(iso); if(isNaN(d)) return esc(iso);
+  const days=Math.ceil((d-Date.now())/86400000);
+  const txt=d.toLocaleDateString('he-IL')+(days<=0?' (עבר!)':days<=3?' ('+days+' ימים)':'');
+  return days<=3?'<span class="deadline-soon">'+txt+'</span>':txt;
+}
+function renderQueue(){
+  const pend=pendingHearings();
+  document.getElementById('queueBadge').textContent=pend.length;
+
+  document.getElementById('queueHelp').innerHTML=
+    'תיק מופיע כאן אם <strong>אין מספר מילים</strong> (טרם תומלל), <strong>לא בוטל</strong>, '+
+    '<strong>טרם שובץ מתמלל</strong>, והדיון כבר התקיים. '+
+    'עומס מתמלל = תיקים פעילים (משובצים אך טרם הוחזרו). בחר תיק כדי לראות מתמללים מדורגים.';
+
+  const rf=document.getElementById('regionFilter').value;
+  const cf=document.getElementById('courtTypeFilter').value;
+  let list=pend.slice();
+  if(rf!=='all') list=list.filter(h=>h.region===rf);
+  if(cf!=='all') list=list.filter(h=>(h.court||'').includes(cf));
+
+  const box=document.getElementById('queueTable');
+  if(!data.hearings.length){
+    box.innerHTML='<div class="empty">אין תיקים. ייבא נתונים מהאקסל.</div>';
+    document.getElementById('assignPanel').innerHTML='';return;
+  }
+  if(!pend.length){
+    box.innerHTML='<div class="empty">כל התיקים שובצו. אין תיקים ממתינים.</div>';
+    document.getElementById('assignPanel').innerHTML='';return;
+  }
+  if(!list.length){box.innerHTML='<div class="empty">אין תיקים ממתינים באזור זה.</div>';}
+  else{
+    let rows='';
+    list.forEach(h=>{
+      const k=hkey(h);
+      rows+='<tr class="clickable'+(k===selectedKey?' selected':'')+'" data-key="'+esc(k)+'">'+
+        '<td><span class="badge region">'+esc(h.region)+'</span></td>'+
+        '<td><strong>'+esc(h.case)+'</strong></td>'+
+        '<td>'+esc(h.court||'—')+'</td>'+
+        '<td>'+esc(h.judge||'—')+'</td>'+
+        '<td>'+fmtDate(h.date)+'</td>'+
+        '<td>'+(h.hours?esc(h.hours)+' ש׳':'—')+'</td>'+
+        '<td><span class="badge urg-'+esc(h.urgency)+'">'+esc(h.urgency)+'</span></td>'+
+        '<td>'+deadlineCell(h.deadline)+'</td>'+
+        '<td><button class="tiny primary" data-key="'+esc(k)+'">בחר ושבץ</button></td>'+
+      '</tr>';
+    });
+    box.innerHTML='<table><thead><tr>'+
+      '<th>אזור</th><th>מספר תיק</th><th>בית משפט</th><th>שופט</th><th>תאריך דיון</th><th>אורך</th>'+
+      '<th>דחיפות</th><th>דדליין</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  renderAssignPanel();
+}
+function renderAssignPanel(){
+  const box=document.getElementById('assignPanel');
+  const h=data.hearings.find(x=>hkey(x)===selectedKey);
+  if(!h){box.innerHTML='';return;}
+  box.innerHTML='<div class="assign-panel">'+
+    '<h3>שיבוץ תיק '+esc(h.case)+' <span class="badge region">'+esc(h.region)+'</span></h3>'+
+    '<div class="ap-meta">'+esc(h.court||'')+' · דיון '+fmtDate(h.date)+
+      ' · דחיפות '+esc(h.urgency)+' · דדליין '+fmtDate(h.deadline)+
+      (h.hearingType?' · '+esc(h.hearingType):'')+'</div>'+
+    '<div class="ap-dur"><label>אורך הקלטה (שעות):</label>'+
+      '<input type="number" id="apDuration" min="0" step="0.25" value="'+(h.hours||'')+'">'+
+      '<span class="hint">'+(h.hours?'מתוך האקסל — ניתן לתקן.':'לא קיים באקסל — הזן הערכה לחישוב העומס.')+'</span>'+
+    '</div><div class="ap-dur"><label>חיפוש מתמלל:</label><input type="text" id="candSearch" placeholder="חיפוש לפי שם..." style="padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px; width:250px;"></div><div id="candList"></div></div>';
+  renderCandidates();
+}
+function renderCandidates(){
+  const list=document.getElementById('candList');
+  if(!list) return;
+  const h=data.hearings.find(x=>hkey(x)===selectedKey);
+  if(!h){list.innerHTML='';return;}
+  const durEl=document.getElementById('apDuration');
+  const searchEl=document.getElementById('candSearch');
+  const dur=num(durEl&&durEl.value,h.hours||0);
+  const q=(searchEl&&searchEl.value||'').trim();
+  
+  let ranked=data.transcribers.slice();
+  if(q) ranked=ranked.filter(t=>(t.name||'').includes(q));
+  ranked.sort(compareT);
+  
+  if(!ranked.length){list.innerHTML='<div class="empty">אין מתמללים בחיפוש זה.</div>';return;}
+  let html='';
+  ranked.forEach((t,i)=>{
+    const s=statusOf(t);
+    const dsl=daysSinceLast(t.name);
+    const projDays=s.rate>0?((s.hours+dur)/s.rate):null;
+    html+='<div class="cand'+(i===0?' recommended':'')+'"><div class="info">'+
+      '<div class="name-row"><strong>'+esc(t.name)+'</strong>'+
+        (i===0?'<span class="ribbon">מומלץ</span>':'')+
+        '<span class="badge '+s.status+'">'+AVAIL_LABELS[s.status]+'</span></div>'+
+      '<div class="area">אזור מועדף: '+esc(t.area||'לא צוין')+'</div>'+
+      '<div class="meta">עומס נוכחי: '+s.cases+' תיקים · '+s.hours.toFixed(1)+' שעות'+
+        (s.days!=null?' (≈ '+s.days.toFixed(1)+' ימי תור)':' · קצב לא ידוע')+
+        (projDays!=null?' &nbsp;←&nbsp; לאחר שיבוץ: ≈ '+projDays.toFixed(1)+' ימי תור':'')+
+        ' · '+(dsl===Infinity?'טרם שובץ מהלוח':'שובץ לפני '+dsl+' ימים')+'</div>'+
+      '</div>'+
+      '<button class="primary" data-assign="'+esc(t.name)+'">שבץ</button></div>';
+  });
+  list.innerHTML=html;
+}
+
+// ===== Render: tracking =====
+function renderTracking(){
+  const list = [];
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // Excel active hearings:
+  if(data.activeHearings){
+    data.activeHearings.forEach(h=>{
+      const deadlineDate = h.deadline ? new Date(h.deadline) : null;
+      if (deadlineDate) { deadlineDate.setHours(0,0,0,0); }
+      const isDelayed = deadlineDate && deadlineDate < today;
+      const isWarning = !isDelayed && deadlineDate && (deadlineDate - today) <= 2 * 86400000;
+      
+      list.push({
+        region: h.region,
+        case: h.case,
+        court: h.court,
+        judge: h.judge || '',
+        date: h.date,
+        duration: h.hours,
+        transcriber: h.transcriber,
+        sentDate: h.sent || '',
+        deadline: h.deadline || '',
+        isDelayed,
+        isWarning,
+        source: 'excel',
+        row: h.row
+      });
+    });
+  }
+
+  // Local active assignments (not yet reflected in Excel):
+  const excelKeys = new Set((data.activeHearings || []).map(h => h.region+'|'+h.case+'|'+h.date));
+  const seenLocalKeys = new Set();
+  assignments.forEach(a=>{
+    const key = a.region+'|'+a.case+'|'+a.date;
+    if(a.status !== 'completed' && !excelKeys.has(key) && !seenLocalKeys.has(key)){
+      seenLocalKeys.add(key);
+      const deadlineDate = a.deadline ? new Date(a.deadline) : null;
+      if (deadlineDate) { deadlineDate.setHours(0,0,0,0); }
+      const isDelayed = deadlineDate && deadlineDate < today;
+      const isWarning = !isDelayed && deadlineDate && (deadlineDate - today) <= 2 * 86400000;
+
+      list.push({
+        region: a.region,
+        case: a.case,
+        court: a.court,
+        judge: a.judge || '',
+        date: a.date,
+        duration: a.duration,
+        transcriber: a.transcriber,
+        sentDate: a.assignedDate ? a.assignedDate.split('T')[0] : '',
+        deadline: a.deadline || '',
+        isDelayed,
+        isWarning,
+        source: 'local',
+        id: a.id
+      });
+    }
+  });
+
+  // Calculate statistics
+  let delayedCount = 0;
+  let warningCount = 0;
+  list.forEach(item => {
+    if(item.isDelayed) delayedCount++;
+    else if(item.isWarning) warningCount++;
+  });
+
+  document.getElementById('trackStats').innerHTML=
+    statCard('סה״כ בעבודה',list.length,'')+
+    statCard('באיחור (עבר דדליין)',delayedCount,delayedCount > 0 ? 'full' : '')+
+    statCard('לקראת איחור (עד יומיים)',warningCount,warningCount > 0 ? 'busy' : '');
+
+  const f=document.getElementById('trackFilter').value;
+  const rf=document.getElementById('trackRegionFilter').value;
+  const cf=document.getElementById('trackCourtFilter').value;
+  const tq=document.getElementById('trackTranscriberFilter').value.trim();
+  let filtered = list.slice();
+  if(f === 'delayed') filtered = filtered.filter(x => x.isDelayed);
+  else if(f === 'soon') filtered = filtered.filter(x => x.isWarning);
+  else if(f === 'normal') filtered = filtered.filter(x => !x.isDelayed && !x.isWarning);
+  
+  if(rf!=='all') filtered = filtered.filter(x => x.region === rf);
+  if(cf!=='all') filtered = filtered.filter(x => (x.court||'').includes(cf));
+  if(tq) filtered = filtered.filter(x => (x.transcriber||'').includes(tq));
+
+  const box=document.getElementById('trackTable');
+  if(!list.length){box.innerHTML='<div class="empty">אין תיקים בעבודה כרגע (כולם הושלמו או ממתינים לשליחה).</div>';return;}
+  if(!filtered.length){box.innerHTML='<div class="empty">אין תיקים בעבודה התואמים לסינון שנבחר.</div>';return;}
+
+  let rows='';
+  filtered.forEach(a=>{
+    let acts='';
+    if(a.source === 'local') {
+      acts = '<button class="tiny danger" data-act="delete" data-id="'+a.id+'">ביטול שיבוץ מקומי</button>';
+    } else {
+      acts = '<span style="font-size:11px;color:var(--muted)">מסונכרן מהאקסל (שורה '+a.row+')</span>';
+    }
+
+    let elapsedTxt = '—';
+    if(a.sentDate) {
+      const sentTime = new Date(a.sentDate).getTime();
+      const diff = Date.now() - sentTime;
+      const days = Math.floor(diff / 86400000);
+      elapsedTxt = days <= 0 ? 'היום' : days + ' ימים';
+    }
+
+    let dlTxt = '—';
+    let dlClass = '';
+    if(a.deadline) {
+      dlTxt = fmtDate(a.deadline);
+      if(a.isDelayed) {
+        dlTxt += ' (עבר!)';
+        dlClass = 'class="deadline-soon"';
+      } else if(a.isWarning) {
+        dlTxt += ' (קרוב!)';
+        dlClass = 'style="color:var(--busy-fg);font-weight:600;"';
+      }
+    }
+
+    rows+='<tr>'+
+      '<td><span class="badge region">'+esc(a.region)+'</span></td>'+
+      '<td><strong>'+esc(a.case)+'</strong></td>'+
+      '<td>'+esc(a.court||'—')+'</td>'+
+      '<td>'+esc(a.judge||'—')+'</td>'+
+      '<td>'+fmtDate(a.date)+'</td>'+
+      '<td>'+(a.duration?esc(a.duration)+' ש׳':'—')+'</td>'+
+      '<td>'+esc(a.transcriber)+'</td>'+
+      '<td>'+fmtDate(a.sentDate)+'</td>'+
+      '<td>'+elapsedTxt+'</td>'+
+      '<td '+dlClass+'>'+dlTxt+'</td>'+
+      '<td>'+acts+'</td></tr>';
+  });
+
+  box.innerHTML='<table><thead><tr>'+
+    '<th>אזור</th><th>תיק</th><th>בית משפט</th><th>שופט</th><th>תאריך דיון</th><th>אורך</th><th>מתמלל</th>'+
+    '<th>נשלח ב-</th><th>זמן שחלף</th><th>דדליין להגשה</th><th>מקור/פעולות</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+function renderAll(){renderFreshness();renderDashboard();renderQueue();renderTracking();}
+
+// ===== Actions =====
+async function assignHearing(name, btnEl){
+  const h=data.hearings.find(x=>hkey(x)===selectedKey);
+  if(!h) return;
+  const durEl=document.getElementById('apDuration');
+  const dur=num(durEl&&durEl.value,h.hours||0);
+  
+  const payload = {
+    case: h.case,
+    transcriber: name,
+    region: h.region,
+    date: h.date,
+    hours: dur,
+    judge: h.judge || ''
+  };
+
+  // Disable all buttons to prevent double submission
+  const allBtns = document.querySelectorAll('#candList button');
+  allBtns.forEach(btn => btn.disabled = true);
+  
+  let originalBtnText = "";
+  if (btnEl) {
+    originalBtnText = btnEl.innerHTML;
+    btnEl.innerHTML = 'משבץ...';
+  }
+
+  toast('מבצע שיבוץ והעלאת קבצים למתמלל...');
+  
+  try {
+    const res = await fetch('http://localhost:5050/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const result = await res.json();
+    if (res.ok && result.ok) {
+      assignments.push({
+        id:uid(),region:h.region,case:h.case,date:h.date,court:h.court,
+        judge:h.judge || '',
+        duration:dur,transcriber:name,assignedDate:new Date().toISOString(),
+        status:'assigned',completedDate:null,
+        deadline: h.deadline || ''
+      });
+      saveAssign();
+      alert('✅ תיק '+h.case+' שובץ בהצלחה ונשלח ל'+name);
+      selectedKey=null;
+      renderAll();
+    } else {
+      alert('❌ שגיאה בשיבוץ: ' + (result.error || 'שגיאה לא ידועה'));
+      // Restore buttons
+      allBtns.forEach(btn => btn.disabled = false);
+      if (btnEl) btnEl.innerHTML = originalBtnText;
+    }
+  } catch (err) {
+    console.error(err);
+    alert('❌ שגיאה: לא ניתן להתחבר לשרת המקומי. ודא ששרת האישורים (approval_server.py) פועל במחשב.');
+    // Restore buttons
+    allBtns.forEach(btn => btn.disabled = false);
+    if (btnEl) btnEl.innerHTML = originalBtnText;
+  }
+}
+function trackAction(act,id){
+  const a=assignments.find(x=>x.id===id);
+  if(!a) return;
+  if(act==='start') a.status='in_progress';
+  else if(act==='complete'){a.status='completed';a.completedDate=new Date().toISOString();}
+  else if(act==='revert'){a.status='in_progress';a.completedDate=null;}
+  else if(act==='delete'){
+    if(!confirm('למחוק את שיבוץ התיק '+a.case+'? התיק יחזור לרשימת הממתינים.')) return;
+    assignments=assignments.filter(x=>x.id!==id);
+  }
+  saveAssign();renderAll();
+}
+
+// ===== Events =====
+function initEvents(){
+  document.querySelectorAll('nav.tabs button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('section.panel').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById(b.dataset.tab).classList.add('active');
+    });
+  });
+
+  document.getElementById('btnSync').addEventListener('click', async () => {
+    const btn = document.getElementById('btnSync');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'מסנכרן...';
+    toast('מתחבר לשרת ומחלץ נתונים מהאקסל...');
+    try {
+      const res = await fetch('http://localhost:5050/sync');
+      const result = await res.json();
+      if (res.ok && result.ok) {
+        data = result.data;
+        isSample = false;
+        selectedKey = null;
+        saveData();
+        renderAll();
+        toast('הסנכרון הושלם בהצלחה!');
+      } else {
+        alert('שגיאה בסנכרון: ' + (result.error || 'שגיאה לא ידועה'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה: לא ניתן להתחבר לשרת המקומי (approval_server.py).');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  });
+
+  document.getElementById('btnImport').addEventListener('click',()=>document.getElementById('fileInput').click());
+  document.getElementById('fileInput').addEventListener('change',e=>{
+    const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=ev=>importJSON(ev.target.result);
+    rd.readAsText(f,'UTF-8');
+    e.target.value='';
+  });
+
+  document.getElementById('dashSearch').addEventListener('input',renderDashboard);
+  document.getElementById('regionFilter').addEventListener('change',()=>{selectedKey=null;renderQueue();});
+  document.getElementById('courtTypeFilter').addEventListener('change',()=>{selectedKey=null;renderQueue();});
+  document.getElementById('trackFilter').addEventListener('change',renderTracking);
+  document.getElementById('trackRegionFilter').addEventListener('change',renderTracking);
+  document.getElementById('trackCourtFilter').addEventListener('change',renderTracking);
+  document.getElementById('trackTranscriberFilter').addEventListener('input',renderTracking);
+
+  document.getElementById('queueTable').addEventListener('click',e=>{
+    const el=e.target.closest('[data-key]');
+    if(el){selectedKey=el.dataset.key;renderQueue();
+      document.getElementById('assignPanel').scrollIntoView({behavior:'smooth',block:'nearest'});}
+  });
+  document.getElementById('assignPanel').addEventListener('click',e=>{
+    const ab=e.target.closest('[data-assign]');
+    if(ab) assignHearing(ab.dataset.assign, ab);
+  });
+  document.getElementById('assignPanel').addEventListener('input',e=>{
+    if(e.target.id==='apDuration' || e.target.id==='candSearch') renderCandidates();
+  });
+  document.getElementById('trackTable').addEventListener('click',e=>{
+    const b=e.target.closest('[data-act]');
+    if(b) trackAction(b.dataset.act,b.dataset.id);
+  });
+
+  const modal=document.getElementById('settingsModal');
+  document.getElementById('btnSettings').addEventListener('click',()=>{
+    document.getElementById('setFree').value=settings.freeDays;
+    document.getElementById('setFull').value=settings.fullDays;
+    modal.classList.add('open');
+  });
+  document.getElementById('setCancel').addEventListener('click',()=>modal.classList.remove('open'));
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('open');});
+  document.getElementById('setSave').addEventListener('click',()=>{
+    const fr=num(document.getElementById('setFree').value,settings.freeDays);
+    const fu=num(document.getElementById('setFull').value,settings.fullDays);
+    if(fr>=0) settings.freeDays=fr;
+    if(fu>fr) settings.fullDays=fu;
+    saveSettings();modal.classList.remove('open');renderAll();toast('ההגדרות נשמרו');
+  });
+}
+
+// ===== Init =====
+load();
+syncAssignmentsWithExcel();
+initEvents();
+renderAll();
+</script>
+</body>
+</html>
